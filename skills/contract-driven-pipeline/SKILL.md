@@ -62,16 +62,17 @@ If `import yaml` fails, run `%pip install pyyaml` first. Exit code `0` = OK, `1`
 ### 4. Generate governance
 `ct.main(["governance", CONTRACT, "--out", GOVERNANCE_PATH])`. Do not hand-edit the output.
 
-### 5. Deploy the pipeline definition (CREATE mode only)
+### 5. Self-check (mandatory)
+`ct.main(["check", CONTRACT, PIPELINE_PATH, "--governance", GOVERNANCE_PATH])`.
+If it FAILS, fix the code and re-run. After 3 failed attempts stop and report the remaining findings — do not hand over code that fails the check.
+
+### 6. Deploy the pipeline definition (CREATE mode only — mandatory, do not skip)
 `ct.main(["deploy", CONTRACT, PIPELINE_ROOT])` — creates the Lakeflow pipeline `<name>_pipeline` from the
 contract: target catalog/schema from `servers`, landing path config from `customProperties`, serverless,
 triggered, **development mode**. It prints the pipeline URL. It **never starts a run**.
-Run it only after step 6 passes (order: 3 → 4 → 6 → 5 is fine). In UPDATE mode do not redeploy:
-settings changes (servers / source) are breaking and never reach this step.
-
-### 6. Self-check (mandatory)
-`ct.main(["check", CONTRACT, PIPELINE_PATH, "--governance", GOVERNANCE_PATH])`.
-If it FAILS, fix the code and re-run. After 3 failed attempts stop and report the remaining findings — do not hand over code that fails the check.
+Run it right after the check passes. In CREATE mode the task is **not finished** until `deploy` has printed
+a pipeline URL — if it fails, show the error and stop. In UPDATE mode skip this step: the pipeline already
+exists, and settings changes (servers / source) are breaking and never get this far.
 
 ### 7. Record the applied contract
 Copy the contract to the applied snapshot path (overwrite). This is part of the same change set and is reviewed together with the code.
