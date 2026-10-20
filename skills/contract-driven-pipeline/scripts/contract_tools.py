@@ -293,7 +293,19 @@ class Change:
         return f"{self.kind:<9} {self.where}: {self.message}"
 
 
+def _canon(x):
+    """Whitespace-insensitive view for comparisons (YAML folding vs. Excel cells must not count as a change)."""
+    if isinstance(x, str):
+        return " ".join(x.split())
+    if isinstance(x, list):
+        return [_canon(v) for v in x]
+    if isinstance(x, dict):
+        return {k: _canon(v) for k, v in x.items()}
+    return x
+
+
 def diff_contracts(old: dict, new: dict) -> dict:
+    old, new = _canon(old), _canon(new)
     ch: list[Change] = []
     add = lambda k, w, m: ch.append(Change(k, w, m))
 

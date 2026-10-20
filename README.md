@@ -5,8 +5,9 @@ Demo repository for the TECH Connect Day spotlight session (Tirana, 22 Oct 2026)
 
 | Responsibility | Lives in | Says |
 |---|---|---|
-| **Data contract** (ODCS v3 YAML) | `contracts/cargo_shipments.odcs.yaml` | *what* the pipeline must deliver |
-| **Genie Code skill** | `skills/contract-driven-pipeline/` | *how* our team builds pipelines |
+| **Excel spec** (data owner) | `specs/cargo_shipments.xlsx` | the dataset in business terms — the source of the contract |
+| **Data contract** (ODCS v3 YAML) | `contracts/cargo_shipments.odcs.yaml` | *what* the pipeline must deliver (generated from the Excel) |
+| **Genie Code skills** | `skills/excel-to-data-contract/`, `skills/contract-driven-pipeline/` | Excel → contract; *how* our team builds pipelines |
 | **Genie Code, Agent mode** | Lakeflow Pipelines Editor | generates and maintains the pipeline |
 
 All data is fictional (invented shippers, randomised AWBs).
@@ -14,10 +15,18 @@ All data is fictional (invented shippers, randomised AWBs).
 ## Repository layout
 
 ```
+specs/
+  cargo_shipments.xlsx               active Excel spec (what the data owner maintains)
 contracts/
-  cargo_shipments.odcs.yaml          active contract (what the producer has published)
+  cargo_shipments.odcs.yaml          active contract — generated from the Excel in Act 0
   _applied/                          snapshot of the contract the current code was built from (agent writes it)
-demo/contract_versions/              v1.0.0 · v1.1.0 (additive) · v2.0.0 (breaking) · v1.2.0-mislabelled (bonus)
+demo/spec_versions/                  the owner's Excel edits: v1.0.0 · v1.1.0 · v2.0.0 · v1.2.0-mislabelled (blank version = tool proposes)
+demo/contract_versions/              the same versions as contracts (fallback / pipeline-skill-only path)
+skills/excel-to-data-contract/
+  SKILL.md                           Excel → contract workflow, versioning, breaking-change gate
+  mapping.md                         sheet/column → contract mapping, accepted values, common fixes
+  reference/data_contract_template.xlsx   blank workbook for data owners
+  scripts/excel_contract.py          convert · template · from-contract · set
 skills/contract-driven-pipeline/
   SKILL.md                           workflow + guardrails the agent follows
   conventions.md                     team standards (layering, naming, try_cast, tags…)
@@ -43,18 +52,22 @@ privileges to create a schema + volume in a catalog, and `APPLY TAG` on the targ
 2. Open `setup/00_setup_environment`, set the catalog (default `tc_demo`), *Run all*.
    It creates `<catalog>.cargo_landing.raw` (volume) and `<catalog>.cargo`, and points every contract at your catalog.
    Commit the contract change if the catalog isn't `tc_demo`.
-3. Run `setup/03_create_pipeline_and_install_skill` — installs the skill into your
+3. Run `setup/03_create_pipeline_and_install_skill` — installs **both skills** into your
    `/Users/<you>/.assistant/skills/` (Genie Code loads it automatically). Each presenter runs it once.
 4. **Don't create the pipeline.** In Act 1 the agent builds the code *and* deploys the pipeline definition from the
    contract (`contract_tools.py deploy`: catalog/schema from `servers`, landing path from `customProperties`,
    serverless, triggered, development mode — it never starts a run). Fallback: `RUN_FALLBACK = True` in `03`.
-5. Run `tests/run_contract_tests` → `all contract_tools tests passed`.
+5. Run `tests/run_contract_tests` → `all contract_tools tests passed` and `all excel_contract tests passed`.
 6. **Dry run the whole demo once** (docs/DEMO_SCRIPT.md), using `tests/verify_demo_state` after each act.
    Record it — that recording is your on-stage fallback.
-7. Reset with `setup/99_reset_demo`, land batch 1 (`setup/01_land_batch`, batch = 1),
+7. Reset with `setup/99_reset_demo` (start_from = excel), land batch 1 (`setup/01_land_batch`, batch = 1),
    then commit and create a branch `demo-start` so a reset is one Git operation.
 
 ## How the guardrails work
+
+- **Validated spec.** The Excel is checked cell by cell (`Columns!row 7: required must be yes/no`); nothing is guessed.
+- **Versioning by the tool.** Leave the version blank: the change is classified and the bump proposed. A too-small
+  version or a breaking change blocks the contract — before any pipeline is touched.
 
 - **Deterministic where it matters.** Rule predicates, governance SQL and the contract diff come from
   `contract_tools.py`, not from the model. The agent assembles code; it doesn't invent rules.

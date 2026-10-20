@@ -1,137 +1,138 @@
 # Demo script — "Write the Contract, Let the Agent Build the Pipeline"
 
-Slot: 15–20 min · live demo ≈ 9 min · recorded fallback for every act.
+Slot: 15–20 min · live demo ≈ 11 min · recorded fallback for every act.
+Two skills, one chain: **Excel spec → data contract → pipeline**.
+All prompts below are printed with your exact paths by `setup/03_create_pipeline_and_install_skill`.
 
 ## Before you go on stage (T-30 min)
 
-- [ ] Git folder on branch `demo-start`; `setup/99_reset_demo` run; batch 1 landed (`setup/01_land_batch`, batch=1).
-- [ ] **No pipeline exists yet** (the agent creates it); delete `cargo_shipments_pipeline` if a rehearsal left one. Serverless warmed (run any notebook cell once).
-- [ ] Genie Code: skill installed via `setup/03_create_pipeline_and_install_skill`, **new chat open**, Agent mode on.
+- [ ] `setup/99_reset_demo` run with **start_from = excel** (no contract, no pipeline, Excel spec v1.0.0); batch 1 landed (`setup/01_land_batch`, batch=1).
+- [ ] Jobs & Pipelines shows **no** `cargo_shipments_pipeline`. Serverless warmed (run any notebook cell once).
+- [ ] Both skills installed via `setup/03` (re-run after any skill change); Genie Code **new chat open**, Agent mode on; `@` lists `excel-to-data-contract` and `contract-driven-pipeline`.
 - [ ] Tabs, left to right:
-  1. `contracts/cargo_shipments.odcs.yaml`
-  2. `skills/contract-driven-pipeline/SKILL.md`
-  3. `pipelines/cargo_shipments/explorations/contract_checks` with the Genie Code pane open (Act 1 starts here)
+  1. `specs/cargo_shipments.xlsx` (download/open in Excel, or show the sheets in the file preview)
+  2. `skills/` folder — both `SKILL.md` files
+  3. `pipelines/cargo_shipments/explorations/contract_checks` with the Genie Code pane open (all acts are prompted here)
   4. Jobs & Pipelines list (the new pipeline appears here)
-  5. `setup/01_land_batch` (batch=2 preselected) and `setup/02_publish_contract_version`
+  5. `setup/01_land_batch` (batch 2 preselected) and `setup/02_publish_contract_version` (Publish = excel)
   6. Catalog Explorer on `<catalog>.cargo`
-  7. Fallback recording, paused at 0:00
+  7. Fallback recordings, paused at 0:00
 - [ ] Browser zoom 125–150 %, notifications off, Genie Code pane widened.
 
-## 0:00 – 3:00 · Concept (slides)
+## 0:00 – 2:30 · Concept (slides)
 
-- Pipelines are still handcrafted: requirements → code, conventions re-implemented every project.
-- Unstructured AI coding makes this *faster but not better*: plausible code, inconsistent with team standards, quality depends on the prompt.
-- The question isn't *can an agent write a pipeline* but *how do we make agent output predictable, governed, maintainable*.
-- Three responsibilities: **contract = what**, **skill = how**, **agent = does the work**, **engineer = reviews**.
+- Pipelines are still handcrafted; standards live in wikis and heads; agreements are implicit.
+- Unstructured AI makes this *faster but not better*.
+- The chain: **spec (Excel) → contract = what → skill = how → agent does the work → engineer reviews**.
 
-## 3:00 – 7:30 · Act 1 — contract v1.0.0 → running pipeline
+## 2:30 – 4:00 · Act 0 — the data owner's Excel becomes the contract
 
-**Show (45 s)** tab 1, the contract. Point at: `version: 1.0.0`, `awb_number` with `pattern` and `primaryKey`,
-`shipper_name` with `classification: confidential` + `pii`, the `quality:` block (`awb_check_digit`, `event_not_in_future` = warning).
-> "This is the only thing the producer and I agree on. No ticket, no email."
+**Show (30 s)** tab 1: the workbook a data owner can fill without YAML — `Contract` sheet (name, domain, catalog, purpose),
+`Columns` (one row per column: type, required, classification, pattern), `Quality` (business rules in plain SQL).
 
-**Show (30 s)** tab 2, the skill. Scroll SKILL.md workflow; flash `conventions.md` and `scripts/contract_tools.py`.
-> "This is our senior engineer's review checklist — written once, versioned in Git, loaded by the agent."
+**Prompt (tab 3):**
+```
+@excel-to-data-contract Create the data contract <repo>/contracts/cargo_shipments.odcs.yaml from the Excel <repo>/specs/cargo_shipments.xlsx
+```
+Expected: dry run → no issues → **create v1.0.0** → validate PASS → summary with the next prompt.
+Open the generated `contracts/cargo_shipments.odcs.yaml`: `version: 1.0.0`, the AWB `pattern`, `shipper_name` = confidential + `pii`, the `quality:` block.
+> "The owner never touched YAML. And the contract is versioned and validated before anyone writes a line of pipeline code."
 
-**Prompt (tab 3, Genie Code, Agent mode)** — exact text is printed by `setup/03_…`:
+*(Optional, 20 s: show a pre-broken copy of the Excel — the tool points at `Columns!row 2: 'AWB Number' must be snake_case`.)*
+
+## 4:00 – 8:00 · Act 1 — contract → running pipeline
+
+**Show (20 s)** tab 2: `contract-driven-pipeline/SKILL.md` workflow — *"our senior engineer's review checklist, written once, versioned in Git."*
+
+**Prompt (tab 3):**
+```
+@contract-driven-pipeline Build and deploy the pipeline for <repo>/contracts/cargo_shipments.odcs.yaml (pipeline root: <repo>/pipelines/cargo_shipments)
+```
+Narrate (≈ 2–4 min): validate PASS → CREATE → `expectations` (17 error rules, 1 warning) → writes `transformations/cargo_shipments.py`
+→ governance notebook → **check** PASS (a self-correction is a feature — say so) → **deploy** creates `cargo_shipments_pipeline`
+(catalog/schema and landing path from the contract, dev mode, *not started*) → snapshot → summary with the link.
+> "Even the pipeline definition comes from the contract. What the agent does *not* do is press Run — that's me, after review."
+
+**Review (30 s)** generated file: header with contract version, `ERROR_RULES`, `try_cast`, quarantine table.
+
+**Run** — open the link (tab 4) → **Run pipeline**. Graph: **bronze 476 → silver 452, quarantine 24**. Silver → *Data quality* tab.
+Tab 3: cells "Why rows were rejected" and "Which contract version" → then the **last cell (apply governance)** → "Governance" cell.
+Tab 6: `shipper_name` tags `classification=confidential`, `pii=true`; table tag `contract_version=1.0.0`.
+
+## 8:00 – 11:30 · Act 2 — the producer changes things (additive)
+
+**Drift (60 s).** Tab 5: `01_land_batch` batch=2 → pipeline **Run** (incremental). Bronze shows **`no_undeclared_fields`**;
+tab 3 "Producer drift" cell: rows carry `{"dg_class": "9"}`.
+> "The producer started sending dangerous-goods classes. We saw it the same day — and nothing silently became a column."
+
+**The owner updates the Excel (30 s).** `02_publish_contract_version` (Publish = excel, v1.1.0) — show the new `dg_class` row
+in `Columns`, and that the **version cell is empty**.
+
+**Prompt 1 — Excel → contract:**
+```
+@excel-to-data-contract The Excel <repo>/specs/cargo_shipments.xlsx changed. Regenerate the data contract <repo>/contracts/cargo_shipments.odcs.yaml.
+```
+Expected: **ADDITIVE** (new optional column + metadata) → **proposed 1.1.0** (minor bump, chosen by the tool) → written.
+
+**Prompt 2 — contract → pipeline:**
+```
+@contract-driven-pipeline The data contract <repo>/contracts/cargo_shipments.odcs.yaml changed. Update the pipeline.
+```
+Expected: diff ADDITIVE → **minimal edit (~7 lines)** → check PASS → "full refresh needed". Show the Git diff; compare with `expected_output/v1.1.0`.
+
+**Run** — **Full refresh all** → **silver 617, quarantine 50**; 39 rows with `dg_class`, 2 invalid `3.9` quarantined (`dg_class_format`).
+Bronze warning gone. Apply governance again → `dangerous_goods` tag, `contract_version=1.1.0`.
+
+## 11:30 – 13:00 · Act 3 — breaking change: two layers say no
+
+`02_publish_contract_version` (Publish = excel, **v2.0.0**): `weight_kg` renamed, `commodity_description` deleted,
+`shipper_country` now required — version cell empty.
 
 ```
-@contract-driven-pipeline Build and deploy the pipeline for /Workspace/Users/nevis.ura@lhind.dlh.de/contract-driven-pipeline-demo/contracts/cargo_shipments.odcs.yaml (pipeline root: /Workspace/Users/nevis.ura@lhind.dlh.de/contract-driven-pipeline-demo/pipelines/cargo_shipments)
+@excel-to-data-contract The Excel <repo>/specs/cargo_shipments.xlsx changed. Regenerate the data contract <repo>/contracts/cargo_shipments.odcs.yaml.
 ```
+Expected: **BREAKING — not written**: four changes (incl. "possible rename"), proposed 2.0.0, asks for the data owner's sign-off.
+Contract and pipeline untouched.
+> "The first gate is at the spec. Nobody's pipeline breaks because somebody edited a spreadsheet."
 
-While it works (≈ 2–4 min), narrate what you see:
-validate PASS → no snapshot → CREATE → `expectations` (17 error rules, 1 warning) → writes `transformations/cargo_shipments.py`
-→ generates governance notebook → **check** (if it fails once and fixes itself, *great* — say so: "that's the guardrail working")
-→ **deploy**: creates `cargo_shipments_pipeline` from the contract (catalog/schema from `servers`, landing path from `customProperties`, dev mode, *not started*)
-→ writes the snapshot → summary table with the pipeline link.
-> "Even the pipeline definition comes from the contract. What the agent does *not* do is press Run — that's my job, after review."
-
-Open the link (tab 4) — the pipeline opens in the Lakeflow Pipelines Editor.
-
-**Review (30 s)** — open the generated file: header with contract version, `ERROR_RULES` block, `try_cast`, quarantine table.
-> "I review this like a colleague's PR. It's the same shape every time because the skill says so."
-
-**Run** — *Run pipeline*. While it runs (≈ 1 min), explain the severity mapping (error → quarantine, warning → tracked, critical → stop).
-Show the graph: **bronze 476 → silver 452, quarantine 24**. Click silver → *Data quality* tab: per-rule failures.
-
-**Governance** — run `governance/apply_uc_governance.sql` (or the last cell of `contract_checks`).
-Tab 6: `silver_cargo_shipments` → column `shipper_name` tags `classification=confidential`, `pii=true`; table tags `contract_version=1.0.0`.
-
-*(Optional: `contract_checks` cell "Why rows were rejected".)*
-
-## 7:00 – 10:30 · Act 2 — the producer changes things (additive)
-
-**Drift first (60 s).** Tab 5: run `01_land_batch` with batch=2. Back in the pipeline: *Run pipeline* (incremental).
-Bronze shows a **`no_undeclared_fields` warning**. `contract_checks` → "Producer drift" cell: rows carry `{"dg_class": "9"}`.
-> "The producer started sending dangerous-goods classes. We saw it the same day — not when a consumer complained.
-> And the pipeline did not silently invent a column."
-
-**Contract v1.1.0 (45 s).** Run `02_publish_contract_version` (v1.1.0), then show the **Git diff** of the contract:
-new optional `dg_class` with a pattern, a reworded description, version 1.1.0.
-
-**Prompt (same chat or new chat):**
-
+**Second layer (optional, 45 s):** `02_publish_contract_version` (Publish = **contract**, v2.0.0) — someone bypasses the Excel.
 ```
-@contract-driven-pipeline The data contract changed. Update the pipeline.
+@contract-driven-pipeline The data contract <repo>/contracts/cargo_shipments.odcs.yaml changed. Update the pipeline.
 ```
+Expected: **⛔ BREAKING CONTRACT CHANGE — not applied**, three options; Git shows **no files changed**.
 
-Expected: `diff` → **ADDITIVE** (new optional column, metadata change; semver OK) → minimal edit → check PASS →
-summary: *full refresh needed: yes* (column added to streaming tables; replays batch 2 so `dg_class` is backfilled).
+**Bonus:** Publish = excel, `v1.2.0-mislabelled` (breaking change typed in as 1.2.0) → *semver violation: needs major*.
 
-**Review (30 s)** — Git diff of `cargo_shipments.py`: **~7 changed lines** (version ×2, bronze schema, silver column + comment,
-one new rule, one cast). Compare with `expected_output/v1.1.0`.
-> "That's the whole maintenance task. The diff is small because the skill says 'minimal edit'."
+## 13:00 – 16:00 · Guardrails, limits, role (slides)
 
-**Run** — *Full refresh all*. Result: **silver 617, quarantine 50** — 39 rows now carry `dg_class`; two with the invalid class `3.9`
-are in quarantine with `dg_class_format`. Bronze warning gone. Run governance again → `dangerous_goods` tag on `dg_class`, `contract_version=1.1.0`.
-
-## 10:30 – 12:00 · Act 3 — breaking change: the agent stops
-
-Run `02_publish_contract_version` with **v2.0.0** (renames `weight_kg` → `gross_weight_kg`, drops `commodity_description`,
-makes `shipper_country` required).
-
-```
-@contract-driven-pipeline The data contract changed. Update the pipeline.
-```
-
-Expected: **⛔ BREAKING CONTRACT CHANGE — not applied**, table of four changes (incl. "possible rename"), three options
-(deprecation period / versioned table `silver_cargo_shipments_v2` / owner sign-off). Show Git: **no files changed**.
-> "This is the most important output of the whole demo: the agent saying no."
-
-**Bonus if time (30 s):** publish `v1.2.0-mislabelled` — same breaking change sold as a minor version. Agent reports a **semver violation**.
-
-Reset the contract afterwards (`02_publish_contract_version` → v1.1.0) if you want to show anything else.
-
-## 12:00 – 16:00 · Guardrails, limits, role (slides)
-
-- Guardrails: declarative expectations · UC comments/tags/properties from the contract · deterministic tools + self-check · breaking-change stop · human review via Git.
-- **Genie ZeroOps** (private preview) as the operational counterpart: diagnoses failed runs and proposes fixes — still for approval. Talking point only, no live demo.
-- Limits seen in practice: non-deterministic form, context and token limits on large contracts/skills, review effort shifts to the engineer.
-  (Background: we used Genie Code skills during a production platform migration on Databricks.)
+- Guardrails: validated spec → versioned contract → contract-derived expectations, UC comments/tags/properties → deterministic tools + self-check → breaking-change stops (twice) → human review via Git, human presses Run.
+- **Genie ZeroOps** (private preview) as the operational counterpart: diagnoses failed runs, proposes fixes for approval. Talking point only.
+- Limits seen in practice: non-deterministic form, context and token limits, review effort shifts to the engineer.
+  (Background: we used Genie Code skills in a production platform migration on Databricks.)
 - Role shift: from writing transformation code → owning specifications, encoding standards, reviewing agent output.
 
 ## 16:00 – 20:00 · Q&A
 
-Likely questions:
-- *"Why not generate the code with a script entirely?"* — Contracts vary (multiple objects, odd sources, edge cases); the agent handles the variance, the tools pin down what must not vary.
+- *"Why Excel?"* — It's where data owners already describe datasets. The skill makes it a validated, versioned input; YAML stays the machine contract.
+- *"Why not generate the code with a script entirely?"* — Contracts vary; the agent handles the variance, the tools pin down what must not vary.
 - *"What if the agent ignores the skill?"* — `check` fails; the skill forbids handing over failing code; the reviewer sees FAIL.
-- *"Where do consumers' contracts fit?"* — Gold tables get their own contracts; same skill pattern, different reference.
-- *"Cost?"* — Agent time per change is minutes; the expensive part, the review, gets smaller because the diff is small and standardised.
+- *"Where do consumers' contracts fit?"* — Gold tables get their own contracts; same pattern, different reference.
 
 ## If something goes wrong
 
 | Symptom | Do this |
 |---|---|
-| Agent doesn't pick up the skill | It's `@`-mentioned in the prompt; if still not loaded: new chat, hard-refresh the tab. |
-| Agent can't run notebook cells | Run the cells in `explorations/contract_checks` yourself — narrate it as "the same tools the agent uses". |
-| `deploy` fails (permissions / SDK) | Set `RUN_FALLBACK = True` in `setup/03_…` and run that cell — same code path; or create the pipeline in the UI (README). |
-| Agent is slow (> 3 min) | Talk through SKILL.md; if still stuck, switch to the recording for that act. |
-| Generated file fails `check` repeatedly | Copy `expected_output/<version>/transformations/cargo_shipments.py` into `transformations/` — "this is what it produced in rehearsal". |
-| Pipeline error on full refresh | Show the recording; mention that serverless start-up is the usual culprit. |
-| `ALTER STREAMING TABLE … SET TAGS` refused | Missing `APPLY TAG` or a governed-tag policy on that key — show the generated SQL and the table properties instead. |
-| Numbers differ from the script | Run `tests/verify_demo_state` for the stage; batch landed twice → reset. |
+| A skill isn't picked up | It's `@`-mentioned; new chat; hard-refresh the tab; re-run `setup/03`. |
+| Agent can't run notebook cells | Run the matching cell in `contract_checks` yourself (Excel convert, validate, check, deploy) — "the same tools the agent uses". |
+| `openpyxl` missing | Run the `%pip install -q openpyxl pyyaml` cell at the top of `contract_checks`. |
+| Excel step fails live | `setup/99_reset_demo` with start_from = contract was the plan B — or `02_publish_contract_version` with Publish = contract, and continue at Act 1 / prompt 2. |
+| Agent is slow (> 3 min) | Talk through the SKILL.md; then switch to the recording for that act. |
+| Generated pipeline fails `check` repeatedly | Copy `expected_output/<version>/…` into `transformations/` / `governance/`. |
+| `deploy` fails | `RUN_FALLBACK = True` in `setup/03` and run that cell. |
+| `ALTER STREAMING TABLE … SET TAGS` refused | Missing `APPLY TAG` / governed-tag policy — show the generated SQL and table properties instead. |
+| Numbers differ from the script | `tests/verify_demo_state` for the stage; batch landed twice → reset. |
 
 ## Recording checklist (fallback)
 
-Record each act separately (≤ 3 min each), 1080p, cursor highlight on, no audio needed — you narrate live.
-Include: the prompt being typed, the agent's tool calls and summary, the diff, the pipeline graph with counts, the tags.
+Record each act separately (≤ 3 min each), 1080p, cursor highlight on, no audio — you narrate live.
+Include: the Excel, each prompt being typed, the agent's tool calls and summary, the diffs, the pipeline graph with counts, the tags.

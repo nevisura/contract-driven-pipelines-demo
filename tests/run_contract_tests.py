@@ -5,6 +5,11 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install -q openpyxl pyyaml
+
+# COMMAND ----------
+
 import os, runpy, sys
-sys.argv = ["test_contract_tools.py"]
-runpy.run_path(os.path.join(os.getcwd(), "test_contract_tools.py"), run_name="__main__")
+for t in ("test_contract_tools.py", "test_excel_contract.py"):
+    sys.argv = [t]
+    runpy.run_path(os.path.join(os.getcwd(), t), run_name="__main__")

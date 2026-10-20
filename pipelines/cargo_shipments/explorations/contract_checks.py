@@ -6,6 +6,10 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install -q openpyxl pyyaml
+
+# COMMAND ----------
+
 dbutils.widgets.text("catalog", "tc_demo", "Catalog")
 CATALOG = dbutils.widgets.get("catalog")
 
@@ -15,12 +19,20 @@ ROOT = Path(os.getcwd()).parents[2]          # <repo>/pipelines/cargo_shipments/
 SKILL_DIR = ROOT / "skills" / "contract-driven-pipeline"
 sys.path.insert(0, str(SKILL_DIR / "scripts"))
 import contract_tools as ct; importlib.reload(ct)
+sys.path.insert(0, str(ROOT / "skills" / "excel-to-data-contract" / "scripts"))
+import excel_contract as xc; importlib.reload(xc)          # needs openpyxl (cell below)
+SPEC = str(ROOT / "specs" / "cargo_shipments.xlsx")
 
 CONTRACT = str(ROOT / "contracts" / "cargo_shipments.odcs.yaml")
 SNAPSHOT = str(ROOT / "contracts" / "_applied" / "cargo_shipments.odcs.yaml")
 PIPELINE = str(ROOT / "pipelines" / "cargo_shipments" / "transformations" / "cargo_shipments.py")
 GOVERNANCE = str(ROOT / "pipelines" / "cargo_shipments" / "governance" / "apply_uc_governance.sql")
 PIPELINE_ROOT = str(ROOT / "pipelines" / "cargo_shipments")
+
+# COMMAND ----------
+
+# Excel -> contract (drop "--dry-run" to write). Requires: %pip install -q openpyxl
+xc.main(["convert", SPEC, CONTRACT, "--dry-run"])
 
 # COMMAND ----------
 

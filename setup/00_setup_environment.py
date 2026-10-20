@@ -6,6 +6,10 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install -q openpyxl pyyaml
+
+# COMMAND ----------
+
 dbutils.widgets.text("catalog", "tc_demo", "Catalog (must exist or you need CREATE CATALOG)")
 dbutils.widgets.dropdown("create_catalog", "no", ["no", "yes"], "Create catalog if missing")
 CATALOG = dbutils.widgets.get("catalog").strip()
@@ -40,6 +44,16 @@ for f in files:
         Path(f).write_text(new)
         print("catalog updated in", f)
 print(f"{len(files)} contract files point at catalog '{CATALOG}'")
+
+# Same for the Excel specs (the Excel is the source the contracts are generated from)
+import sys
+sys.path.insert(0, str(REPO_ROOT / "skills" / "excel-to-data-contract" / "scripts"))
+import excel_contract as xc
+specs = [*glob.glob(str(REPO_ROOT / "specs" / "*.xlsx")), *glob.glob(str(REPO_ROOT / "demo" / "spec_versions" / "*.xlsx"))]
+for f in specs:
+    xc.set_field(f, "catalog", CATALOG)
+    xc.set_field(f, "source_path", LANDING)
+print(f"{len(specs)} Excel specs point at catalog '{CATALOG}'")
 
 # COMMAND ----------
 
