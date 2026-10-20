@@ -43,7 +43,7 @@ privileges to create a schema + volume in a catalog, and `APPLY TAG` on the targ
 2. Open `setup/00_setup_environment`, set the catalog (default `tc_demo`), *Run all*.
    It creates `<catalog>.cargo_landing.raw` (volume) and `<catalog>.cargo`, and points every contract at your catalog.
    Commit the contract change if the catalog isn't `tc_demo`.
-3. **Create the pipeline** (*Jobs & Pipelines → Create → ETL pipeline*):
+3. **Create the pipeline and install the skill**: run `setup/03_create_pipeline_and_install_skill` (does both by code). Or by hand (*Jobs & Pipelines → Create → ETL pipeline*):
    name `cargo_shipments_contract_demo`, root folder `pipelines/cargo_shipments` (existing folder),
    default catalog `<catalog>` / schema `cargo`, serverless, triggered,
    configuration `cargo.landing_path = /Volumes/<catalog>/cargo_landing/raw/shipments`.
