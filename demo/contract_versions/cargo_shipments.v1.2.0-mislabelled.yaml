@@ -53,6 +53,8 @@ customProperties:
     value: json
   - property: sourcePathConf          # pipeline config key that holds the landing path
     value: cargo.landing_path
+  - property: sourcePath              # landing location (environment-specific; setup/00 rewrites the catalog)
+    value: /Volumes/tc_demo/cargo_landing/raw/shipments
 
 schema:
   - name: cargo_shipments

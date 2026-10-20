@@ -28,4 +28,14 @@ assert any("try_cast" in f.message for f in errors(ct.validate_contract(bad)))
 # skill's own reference example passes
 ref = ROOT / "skills/contract-driven-pipeline/reference"
 assert not errors(ct.check_pipeline(ct.load_contract(ref / "example_contract.yaml"), ref / "pipeline_pattern.py"))
+# pipeline spec derived from the contract
+spec = ct.pipeline_spec(c["v1.0.0"], "/Workspace/Users/x/repo/pipelines/cargo_shipments")
+assert spec["name"] == "cargo_shipments_pipeline" and spec["catalog"] == "tc_demo" and spec["schema"] == "cargo"
+assert spec["development"] and spec["serverless"] and not spec["continuous"]
+assert spec["glob"] == "/Workspace/Users/x/repo/pipelines/cargo_shipments/transformations/**"
+assert spec["configuration"] == {"cargo.landing_path": "/Volumes/tc_demo/cargo_landing/raw/shipments"}
+try:
+    ct.pipeline_spec(c["v1.0.0"], "relative/path"); raise AssertionError("relative root accepted")
+except ValueError:
+    pass
 print("all contract_tools tests passed")

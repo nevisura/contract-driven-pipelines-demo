@@ -22,12 +22,12 @@ skills/contract-driven-pipeline/
   SKILL.md                           workflow + guardrails the agent follows
   conventions.md                     team standards (layering, naming, try_cast, tags…)
   reference/                         worked example contract + the exact code pattern expected
-  scripts/contract_tools.py          validate · expectations · diff · governance · check
+  scripts/contract_tools.py          validate · expectations · diff · governance · check · deploy
 pipelines/cargo_shipments/           pipeline root folder
   transformations/                   (empty) — Genie Code writes cargo_shipments.py here
   governance/                        (empty) — generated UC tag notebook
   explorations/contract_checks       runs the tools + the queries shown on stage
-setup/                               00 environment · 01 land batch · 02 publish contract · 99 reset
+setup/                               00 environment · 01 land batch · 02 publish contract · 03 install skill · 99 reset
 tests/                               contract tool tests · verify_demo_state (asserts on-stage numbers)
 expected_output/                     what the agent should produce for v1.0.0 and v1.1.0 (fallback + review aid)
 docs/DEMO_SCRIPT.md                  run-of-show, exact prompts, talking points, fallbacks
@@ -43,12 +43,11 @@ privileges to create a schema + volume in a catalog, and `APPLY TAG` on the targ
 2. Open `setup/00_setup_environment`, set the catalog (default `tc_demo`), *Run all*.
    It creates `<catalog>.cargo_landing.raw` (volume) and `<catalog>.cargo`, and points every contract at your catalog.
    Commit the contract change if the catalog isn't `tc_demo`.
-3. **Create the pipeline and install the skill**: run `setup/03_create_pipeline_and_install_skill` (does both by code). Or by hand (*Jobs & Pipelines → Create → ETL pipeline*):
-   name `cargo_shipments_contract_demo`, root folder `pipelines/cargo_shipments` (existing folder),
-   default catalog `<catalog>` / schema `cargo`, serverless, triggered,
-   configuration `cargo.landing_path = /Volumes/<catalog>/cargo_landing/raw/shipments`.
-4. **Register the skill**: Genie Code pane → *Settings* → *Add folder* → `<repo>/skills`
-   (the parent folder). Make sure `contract-driven-pipeline` is toggled on. Start a new chat.
+3. Run `setup/03_create_pipeline_and_install_skill` — installs the skill into your
+   `/Users/<you>/.assistant/skills/` (Genie Code loads it automatically). Each presenter runs it once.
+4. **Don't create the pipeline.** In Act 1 the agent builds the code *and* deploys the pipeline definition from the
+   contract (`contract_tools.py deploy`: catalog/schema from `servers`, landing path from `customProperties`,
+   serverless, triggered, development mode — it never starts a run). Fallback: `RUN_FALLBACK = True` in `03`.
 5. Run `tests/run_contract_tests` → `all contract_tools tests passed`.
 6. **Dry run the whole demo once** (docs/DEMO_SCRIPT.md), using `tests/verify_demo_state` after each act.
    Record it — that recording is your on-stage fallback.

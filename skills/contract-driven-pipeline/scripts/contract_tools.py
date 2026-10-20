@@ -11,6 +11,9 @@ Commands (CLI or import):
   governance   <contract.yaml> [--out FILE]         Unity Catalog tags notebook (SQL)
   check        <contract.yaml> <pipeline.py> [--governance FILE]
                                                     generated code matches the contract + conventions
+  deploy       <contract.yaml> <pipeline_root> [--name NAME] [--dry-run]
+                                                    create/update the Lakeflow pipeline definition from the
+                                                    contract (dev mode, serverless, triggered). Never starts a run.
 
 Exit code 0 = OK, 1 = findings that block (errors / breaking change), 2 = usage error.
 
@@ -107,6 +110,8 @@ def validate_contract(c: dict) -> list[Finding]:
         E("servers", "needs a databricks server with catalog and schema (the pipeline target)")
     if not _custom(c, "sourcePathConf"):
         E("customProperties", "sourcePathConf (pipeline config key of the landing path) is required")
+    if not _custom(c, "sourcePath"):
+        W("customProperties", "sourcePath (landing location) missing — deploy will need --landing-path")
     if not c.get("team"):
         W("team", "no owner listed")
 
@@ -610,6 +615,54 @@ def check_pipeline(c: dict, pipeline_path: str | Path, governance_path: str | Pa
 
 
 # --------------------------------------------------------------------------- #
+# deploy (pipeline definition from the contract)
+# --------------------------------------------------------------------------- #
+def pipeline_spec(c: dict, pipeline_root: str, name: str | None = None, landing_path: str | None = None) -> dict:
+    """Pure function: the pipeline settings the contract implies. Unit-testable without a workspace."""
+    srv = _server(c)
+    conf_key = _custom(c, "sourcePathConf")
+    landing = landing_path or _custom(c, "sourcePath")
+    if not landing:
+        raise ValueError("contract has no customProperties.sourcePath; pass --landing-path")
+    root = str(pipeline_root).rstrip("/")
+    if not root.startswith("/Workspace/"):
+        raise ValueError(f"pipeline_root must be an absolute /Workspace/... path, got {root}")
+    return {
+        "name": name or f"{c['name']}_pipeline",
+        "catalog": srv["catalog"],
+        "schema": srv["schema"],
+        "serverless": True,
+        "continuous": False,
+        "development": True,
+        "root_path": root,
+        "glob": f"{root}/transformations/**",
+        "configuration": {conf_key: landing},
+    }
+
+
+def deploy_pipeline(c: dict, pipeline_root: str, name: str | None = None, landing_path: str | None = None,
+                    dry_run: bool = False) -> dict:
+    """Create the pipeline if it doesn't exist, otherwise update its settings. Does NOT start an update."""
+    spec = pipeline_spec(c, pipeline_root, name, landing_path)
+    if dry_run:
+        return {"action": "dry-run", "spec": spec}
+    from databricks.sdk import WorkspaceClient
+    from databricks.sdk.service.pipelines import PipelineLibrary, PathPattern
+    w = WorkspaceClient()
+    kwargs = {k: v for k, v in spec.items() if k != "glob"}
+    kwargs["libraries"] = [PipelineLibrary(glob=PathPattern(include=spec["glob"]))]
+    found = [p for p in w.pipelines.list_pipelines(filter=f"name LIKE '{spec['name']}'") if p.name == spec["name"]]
+    if found:
+        pid = found[0].pipeline_id
+        w.pipelines.update(pipeline_id=pid, **kwargs)
+        action = "updated"
+    else:
+        pid = w.pipelines.create(**kwargs).pipeline_id
+        action = "created"
+    return {"action": action, "pipeline_id": pid, "url": f"{w.config.host.rstrip('/')}/pipelines/{pid}", "spec": spec}
+
+
+# --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
 def _print_findings(findings: list[Finding], ok_msg: str) -> int:
@@ -690,6 +743,20 @@ def main(argv: list[str] | None = None) -> int:
         c = load_contract(args[0])
         print(f"Checking {args[1]} against {c['name']} v{c['version']}")
         return _print_findings(check_pipeline(c, args[1], gov), "Pipeline matches the contract and team conventions.")
+
+    if cmd == "deploy" and len(args) >= 2:
+        name, landing = opt("--name"), opt("--landing-path")
+        dry = "--dry-run" in args
+        args = [a for a in args if a != "--dry-run"]
+        c = load_contract(args[0])
+        errs = [x for x in validate_contract(c) if x.level == "ERROR"]
+        if errs:
+            return _print_findings(errs, "")
+        r = deploy_pipeline(c, args[1], name, landing, dry)
+        print(json.dumps(r, indent=2))
+        if r["action"] != "dry-run":
+            print(f"Pipeline {r['action']} (development mode, not started): {r['url']}")
+        return 0
 
     print(__doc__)
     return 2

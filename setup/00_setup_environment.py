@@ -35,6 +35,7 @@ files = [*glob.glob(str(REPO_ROOT / "contracts" / "*.yaml")), *glob.glob(str(REP
 for f in files:
     txt = Path(f).read_text()
     new = re.sub(r"(\n    catalog: ).*", rf"\g<1>{CATALOG}", txt, count=1)
+    new = re.sub(r"/Volumes/[^/]+/cargo_landing/", f"/Volumes/{CATALOG}/cargo_landing/", new)
     if new != txt:
         Path(f).write_text(new)
         print("catalog updated in", f)
@@ -43,19 +44,12 @@ print(f"{len(files)} contract files point at catalog '{CATALOG}'")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Create the pipeline (UI, 2 minutes)
-# MAGIC 1. **Jobs & Pipelines → Create → ETL pipeline**, name `cargo_shipments_contract_demo`.
-# MAGIC 2. *Root folder*: `<this repo>/pipelines/cargo_shipments` (choose **existing folder**, keep the empty `transformations/`).
-# MAGIC 3. *Default catalog / schema*: the catalog above / `cargo`. *Compute*: serverless. *Mode*: triggered.
-# MAGIC 4. *Settings → Configuration*: add `cargo.landing_path` = the landing path printed above.
-# MAGIC 5. Don't run it yet — the transformations folder is empty until Genie Code builds it.
-# MAGIC
-# MAGIC ## Register the skill (Genie Code pane → Settings)
-# MAGIC **Add folder** → `<this repo>/skills` (the *parent* folder, not the skill folder). Toggle `contract-driven-pipeline` on.
-# MAGIC Start a new chat afterwards — skills load at chat start.
+# MAGIC ## Next
+# MAGIC Run `03_create_pipeline_and_install_skill` once per presenter — it installs the Genie Code skill.
+# MAGIC **The pipeline itself is created by the agent** in Act 1 (skill step `deploy`).
+# MAGIC Commit the contract files if the catalog changed.
 
 # COMMAND ----------
 
-print("pipeline configuration:\n  cargo.landing_path =", LANDING)
-print("default catalog / schema:", CATALOG, "/ cargo")
-print("skills folder to register:", REPO_ROOT / "skills")
+print("landing path (in the contracts):", LANDING)
+print("pipeline target:", CATALOG, "/ cargo — created by the agent from the contract")

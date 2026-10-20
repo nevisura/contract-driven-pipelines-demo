@@ -20,6 +20,7 @@ CONTRACT = str(ROOT / "contracts" / "cargo_shipments.odcs.yaml")
 SNAPSHOT = str(ROOT / "contracts" / "_applied" / "cargo_shipments.odcs.yaml")
 PIPELINE = str(ROOT / "pipelines" / "cargo_shipments" / "transformations" / "cargo_shipments.py")
 GOVERNANCE = str(ROOT / "pipelines" / "cargo_shipments" / "governance" / "apply_uc_governance.sql")
+PIPELINE_ROOT = str(ROOT / "pipelines" / "cargo_shipments")
 
 # COMMAND ----------
 
@@ -37,6 +38,11 @@ ct.main(["diff", SNAPSHOT, CONTRACT])
 # COMMAND ----------
 
 ct.main(["check", CONTRACT, PIPELINE, "--governance", GOVERNANCE])
+
+# COMMAND ----------
+
+# Create the pipeline definition from the contract (dev mode; never starts a run). Add "--dry-run" to preview.
+ct.main(["deploy", CONTRACT, PIPELINE_ROOT])
 
 # COMMAND ----------
 

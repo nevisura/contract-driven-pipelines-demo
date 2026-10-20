@@ -1,68 +1,30 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 03 · Create the pipeline and install the skill (by code)
-# MAGIC Run after `00_setup_environment`. Safe to re-run: updates the pipeline and re-syncs the skill.
-# MAGIC - Creates/updates the Lakeflow pipeline `cargo_shipments_contract_demo` (serverless, triggered, dev mode)
-# MAGIC - Copies `skills/contract-driven-pipeline` into **your** `/Users/<you>/.assistant/skills/`
-# MAGIC   (Genie Code loads that folder automatically — no settings needed). Each presenter runs this once.
+# MAGIC # 03 · Install the skill (and, only as a fallback, create the pipeline)
+# MAGIC Run after `00_setup_environment`, once per presenter. Safe to re-run.
+# MAGIC 1. Copies `skills/contract-driven-pipeline` into **your** `/Users/<you>/.assistant/skills/` —
+# MAGIC    Genie Code loads that folder automatically. Re-run after any change to the skill, then start a new chat.
+# MAGIC 2. *(Fallback only)* creates the pipeline definition the same way the agent does in Act 1 (`contract_tools deploy`).
+# MAGIC    Normally you **skip** this cell — creating the pipeline is the agent's job on stage.
 
 # COMMAND ----------
 
-# MAGIC %pip install -q --upgrade databricks-sdk
-# MAGIC %restart_python
-
-# COMMAND ----------
-
-dbutils.widgets.text("catalog", "tc_demo", "Catalog")
-dbutils.widgets.text("pipeline_name", "cargo_shipments_contract_demo", "Pipeline name")
-CATALOG = dbutils.widgets.get("catalog").strip()
-NAME = dbutils.widgets.get("pipeline_name").strip()
-
-import os, shutil
+import os, shutil, sys, importlib
 from pathlib import Path
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.pipelines import PipelineLibrary, PathPattern
 
-w = WorkspaceClient()
-ME = w.current_user.me().user_name
 REPO = Path(os.getcwd()).parent                     # this notebook lives in <repo>/setup
-ROOT = str(REPO / "pipelines" / "cargo_shipments")
-LANDING = f"/Volumes/{CATALOG}/cargo_landing/raw/shipments"
-assert (REPO / "contracts" / "cargo_shipments.odcs.yaml").exists(), f"repo not found at {REPO}"
+SKILL_SRC = REPO / "skills" / "contract-driven-pipeline"
+assert (SKILL_SRC / "SKILL.md").exists(), f"repo not found at {REPO}"
+ME = spark.sql("SELECT current_user()").first()[0]
 print("repo:", REPO, "| user:", ME)
 
 # COMMAND ----------
 
-# 1) Pipeline — create, or update if one with this name exists
-spec = dict(
-    name=NAME,
-    catalog=CATALOG,
-    schema="cargo",
-    serverless=True,
-    continuous=False,
-    development=True,
-    root_path=ROOT,
-    libraries=[PipelineLibrary(glob=PathPattern(include=f"{ROOT}/transformations/**"))],
-    configuration={"cargo.landing_path": LANDING},
-)
-existing = [p for p in w.pipelines.list_pipelines(filter=f"name LIKE '{NAME}'") if p.name == NAME]
-if existing:
-    pid = existing[0].pipeline_id
-    w.pipelines.update(pipeline_id=pid, **spec)
-    print("updated pipeline", pid)
-else:
-    pid = w.pipelines.create(**spec).pipeline_id
-    print("created pipeline", pid)
-print(f"open it: {w.config.host}/pipelines/{pid}")
-
-# COMMAND ----------
-
-# 2) Skill — copy the repo's skill into your personal Genie Code skills folder
-src = REPO / "skills" / "contract-driven-pipeline"
+# 1) Install / re-sync the skill into your personal Genie Code skills folder
 dst = Path(f"/Workspace/Users/{ME}/.assistant/skills/contract-driven-pipeline")
 if dst.exists():
-    shutil.rmtree(dst)                                 # replace stale copy (single source = the repo)
-shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    shutil.rmtree(dst)                                 # the repo is the single source of truth
+shutil.copytree(SKILL_SRC, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
 print("skill installed ->", dst)
 for f in sorted(dst.rglob("*")):
     if f.is_file():
@@ -71,11 +33,20 @@ for f in sorted(dst.rglob("*")):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Next
-# MAGIC 1. Open the pipeline link above → Genie Code pane → **new chat** → **Agent mode**.
-# MAGIC 2. Type `@` and check `contract-driven-pipeline` is suggested (hard-refresh the tab if not).
-# MAGIC 3. Prompt (path printed below):
+# MAGIC ## Act 1 prompt
+# MAGIC Open `pipelines/cargo_shipments/explorations/contract_checks` → Genie Code pane → **new chat** → **Agent mode** →
+# MAGIC type `@` to confirm `contract-driven-pipeline` is listed → paste the prompt printed below.
 
 # COMMAND ----------
 
-print(f"@contract-driven-pipeline Build the pipeline for {REPO / 'contracts' / 'cargo_shipments.odcs.yaml'}")
+print(f"@contract-driven-pipeline Build and deploy the pipeline for {REPO / 'contracts' / 'cargo_shipments.odcs.yaml'} "
+      f"(pipeline root: {REPO / 'pipelines' / 'cargo_shipments'})")
+
+# COMMAND ----------
+
+# 2) FALLBACK ONLY — create the pipeline definition without the agent (same code path the agent uses)
+RUN_FALLBACK = False
+if RUN_FALLBACK:
+    sys.path.insert(0, str(SKILL_SRC / "scripts"))
+    import contract_tools as ct; importlib.reload(ct)
+    ct.main(["deploy", str(REPO / "contracts" / "cargo_shipments.odcs.yaml"), str(REPO / "pipelines" / "cargo_shipments")])

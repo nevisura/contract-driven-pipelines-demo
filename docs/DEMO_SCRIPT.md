@@ -5,13 +5,13 @@ Slot: 15–20 min · live demo ≈ 9 min · recorded fallback for every act.
 ## Before you go on stage (T-30 min)
 
 - [ ] Git folder on branch `demo-start`; `setup/99_reset_demo` run; batch 1 landed (`setup/01_land_batch`, batch=1).
-- [ ] Pipeline exists, **not yet run** since reset; serverless warmed (run any notebook cell once).
-- [ ] Genie Code: skill folder registered, `contract-driven-pipeline` toggled on, **new chat open**, Agent mode on.
+- [ ] **No pipeline exists yet** (the agent creates it); delete `cargo_shipments_pipeline` if a rehearsal left one. Serverless warmed (run any notebook cell once).
+- [ ] Genie Code: skill installed via `setup/03_create_pipeline_and_install_skill`, **new chat open**, Agent mode on.
 - [ ] Tabs, left to right:
   1. `contracts/cargo_shipments.odcs.yaml`
   2. `skills/contract-driven-pipeline/SKILL.md`
-  3. Pipeline in the Lakeflow Pipelines Editor (Genie Code pane open)
-  4. `pipelines/cargo_shipments/explorations/contract_checks`
+  3. `pipelines/cargo_shipments/explorations/contract_checks` with the Genie Code pane open (Act 1 starts here)
+  4. Jobs & Pipelines list (the new pipeline appears here)
   5. `setup/01_land_batch` (batch=2 preselected) and `setup/02_publish_contract_version`
   6. Catalog Explorer on `<catalog>.cargo`
   7. Fallback recording, paused at 0:00
@@ -24,7 +24,7 @@ Slot: 15–20 min · live demo ≈ 9 min · recorded fallback for every act.
 - The question isn't *can an agent write a pipeline* but *how do we make agent output predictable, governed, maintainable*.
 - Three responsibilities: **contract = what**, **skill = how**, **agent = does the work**, **engineer = reviews**.
 
-## 3:00 – 7:00 · Act 1 — contract v1.0.0 → running pipeline
+## 3:00 – 7:30 · Act 1 — contract v1.0.0 → running pipeline
 
 **Show (45 s)** tab 1, the contract. Point at: `version: 1.0.0`, `awb_number` with `pattern` and `primaryKey`,
 `shipper_name` with `classification: confidential` + `pii`, the `quality:` block (`awb_check_digit`, `event_not_in_future` = warning).
@@ -33,16 +33,20 @@ Slot: 15–20 min · live demo ≈ 9 min · recorded fallback for every act.
 **Show (30 s)** tab 2, the skill. Scroll SKILL.md workflow; flash `conventions.md` and `scripts/contract_tools.py`.
 > "This is our senior engineer's review checklist — written once, versioned in Git, loaded by the agent."
 
-**Prompt (tab 3, Genie Code, Agent mode):**
+**Prompt (tab 3, Genie Code, Agent mode)** — exact text is printed by `setup/03_…`:
 
 ```
-@contract-driven-pipeline Build the pipeline for contracts/cargo_shipments.odcs.yaml
+@contract-driven-pipeline Build and deploy the pipeline for /Workspace/Users/nevis.ura@lhind.dlh.de/contract-driven-pipeline-demo/contracts/cargo_shipments.odcs.yaml (pipeline root: /Workspace/Users/nevis.ura@lhind.dlh.de/contract-driven-pipeline-demo/pipelines/cargo_shipments)
 ```
 
-While it works (≈ 1–3 min), narrate what you see:
+While it works (≈ 2–4 min), narrate what you see:
 validate PASS → no snapshot → CREATE → `expectations` (17 error rules, 1 warning) → writes `transformations/cargo_shipments.py`
 → generates governance notebook → **check** (if it fails once and fixes itself, *great* — say so: "that's the guardrail working")
-→ writes the snapshot → summary table.
+→ **deploy**: creates `cargo_shipments_pipeline` from the contract (catalog/schema from `servers`, landing path from `customProperties`, dev mode, *not started*)
+→ writes the snapshot → summary table with the pipeline link.
+> "Even the pipeline definition comes from the contract. What the agent does *not* do is press Run — that's my job, after review."
+
+Open the link (tab 4) — the pipeline opens in the Lakeflow Pipelines Editor.
 
 **Review (30 s)** — open the generated file: header with contract version, `ERROR_RULES` block, `try_cast`, quarantine table.
 > "I review this like a colleague's PR. It's the same shape every time because the skill says so."
@@ -119,7 +123,8 @@ Likely questions:
 | Symptom | Do this |
 |---|---|
 | Agent doesn't pick up the skill | It's `@`-mentioned in the prompt; if still not loaded: new chat, hard-refresh the tab. |
-| Agent can't run notebook cells from the editor | Run the cells in `explorations/contract_checks` yourself — narrate it as "the same tools the agent uses". |
+| Agent can't run notebook cells | Run the cells in `explorations/contract_checks` yourself — narrate it as "the same tools the agent uses". |
+| `deploy` fails (permissions / SDK) | Set `RUN_FALLBACK = True` in `setup/03_…` and run that cell — same code path; or create the pipeline in the UI (README). |
 | Agent is slow (> 3 min) | Talk through SKILL.md; if still stuck, switch to the recording for that act. |
 | Generated file fails `check` repeatedly | Copy `expected_output/<version>/transformations/cargo_shipments.py` into `transformations/` — "this is what it produced in rehearsal". |
 | Pipeline error on full refresh | Show the recording; mention that serverless start-up is the usual culprit. |

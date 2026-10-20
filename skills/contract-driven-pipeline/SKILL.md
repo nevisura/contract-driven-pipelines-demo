@@ -1,6 +1,6 @@
 ---
 name: contract-driven-pipeline
-description: Create or update a Lakeflow declarative pipeline (bronze -> silver + quarantine) from an ODCS v3 data contract YAML, applying team conventions, contract-derived expectations and Unity Catalog governance. Use when asked to build, regenerate, update or check a pipeline from a data contract, or when a data contract changed.
+description: Create or update a Lakeflow declarative pipeline (bronze -> silver + quarantine) from an ODCS v3 data contract YAML — code, pipeline definition, contract-derived expectations and Unity Catalog governance — following team conventions. Use when asked to build, deploy, regenerate, update or check a pipeline from a data contract, or when a data contract changed.
 ---
 
 # Contract-driven pipeline
@@ -16,12 +16,12 @@ Files in this skill (paths relative to this folder):
 |---|---|
 | `conventions.md` | Team rules: layering, naming, audit columns, casting, what is forbidden |
 | `reference/pipeline_pattern.py` | The exact code structure to produce (worked example for `reference/example_contract.yaml`) |
-| `scripts/contract_tools.py` | Deterministic helpers: `validate`, `expectations`, `diff`, `governance`, `check` |
+| `scripts/contract_tools.py` | Deterministic helpers: `validate`, `expectations`, `diff`, `governance`, `check`, `deploy` |
 
 ## How to run the tools
 
-Run them in a Python notebook cell (in the pipeline's `explorations/` folder, e.g.
-`explorations/contract_checks`). Use the absolute `/Workspace/...` path of this skill folder:
+Run them in a Python notebook cell (e.g. the repo's `pipelines/<name>/explorations/contract_checks`
+notebook, or a new notebook). Use the absolute `/Workspace/...` path of this skill folder:
 
 ```python
 import sys, importlib
@@ -32,6 +32,7 @@ ct.main(["validate", "<contract.yaml>"])
 ```
 
 If `import yaml` fails, run `%pip install pyyaml` first. Exit code `0` = OK, `1` = blocking findings.
+`deploy` needs `databricks-sdk` (preinstalled; if an import fails: `%pip install --upgrade databricks-sdk`).
 
 ## Inputs to locate first
 
@@ -39,6 +40,7 @@ If `import yaml` fails, run `%pip install pyyaml` first. Exit code `0` = OK, `1`
 - **Applied snapshot**: `contracts/_applied/<name>.odcs.yaml` — the contract version the current code was generated from. Missing = the pipeline was never generated.
 - **Pipeline code**: `pipelines/<name>/transformations/<name>.py`.
 - **Governance notebook**: `pipelines/<name>/governance/apply_uc_governance.sql`.
+- **Pipeline root**: `pipelines/<name>` (absolute `/Workspace/...` path) — the pipeline definition points here.
 
 ## Workflow
 
@@ -60,15 +62,22 @@ If `import yaml` fails, run `%pip install pyyaml` first. Exit code `0` = OK, `1`
 ### 4. Generate governance
 `ct.main(["governance", CONTRACT, "--out", GOVERNANCE_PATH])`. Do not hand-edit the output.
 
-### 5. Self-check (mandatory)
+### 5. Deploy the pipeline definition (CREATE mode only)
+`ct.main(["deploy", CONTRACT, PIPELINE_ROOT])` — creates the Lakeflow pipeline `<name>_pipeline` from the
+contract: target catalog/schema from `servers`, landing path config from `customProperties`, serverless,
+triggered, **development mode**. It prints the pipeline URL. It **never starts a run**.
+Run it only after step 6 passes (order: 3 → 4 → 6 → 5 is fine). In UPDATE mode do not redeploy:
+settings changes (servers / source) are breaking and never reach this step.
+
+### 6. Self-check (mandatory)
 `ct.main(["check", CONTRACT, PIPELINE_PATH, "--governance", GOVERNANCE_PATH])`.
 If it FAILS, fix the code and re-run. After 3 failed attempts stop and report the remaining findings — do not hand over code that fails the check.
 
-### 6. Record the applied contract
+### 7. Record the applied contract
 Copy the contract to the applied snapshot path (overwrite). This is part of the same change set and is reviewed together with the code.
 
-### 7. Hand over for review — do not deploy
-Do **not** run a production update and do not merge. Reply with the summary below. The engineer reviews the diff, runs the pipeline, then runs the governance notebook.
+### 8. Hand over for review — do not run
+Do **not** start a pipeline update, do not run in production and do not merge. Reply with the summary below. The engineer reviews the diff, runs the pipeline, then runs the governance notebook.
 
 ## Output formats
 
@@ -81,7 +90,8 @@ Contract <name> <old> -> <new> applied   (check: PASS)
 | ... | ... |
 Full refresh needed: yes/no — <why>
 Reviewer, please check: <1-3 specific things, e.g. new rule may quarantine existing rows>
-Next: run the pipeline, then governance/apply_uc_governance.sql
+Pipeline: <url from deploy, or "existing pipeline, settings unchanged">
+Next: review the diff, run the pipeline, then governance/apply_uc_governance.sql
 ```
 
 A full refresh is needed whenever a column is added to or removed from a streaming table schema,
@@ -115,4 +125,5 @@ If the semver bump is too small, say so explicitly: the producer labelled a brea
 Prompt: *"Build the pipeline for contracts/cargo_shipments.odcs.yaml"* →
 validate PASS → no snapshot → CREATE → `transformations/cargo_shipments.py` with
 `bronze_cargo_shipments`, `silver_cargo_shipments`, `silver_cargo_shipments_quarantine`,
-17 error rules, 1 warning rule → governance notebook → check PASS → snapshot written → summary.
+17 error rules, 1 warning rule → governance notebook → check PASS → `deploy` creates
+`cargo_shipments_pipeline` (dev mode) → snapshot written → summary with the pipeline link.

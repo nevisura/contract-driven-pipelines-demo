@@ -23,6 +23,8 @@ customProperties:
     value: json
   - property: sourcePathConf
     value: network.landing_path
+  - property: sourcePath
+    value: /Volumes/example_catalog/network_landing/raw/flight_legs
 schema:
   - name: flight_legs
     physicalName: silver_flight_legs
