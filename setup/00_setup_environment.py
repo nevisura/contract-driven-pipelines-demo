@@ -10,7 +10,7 @@
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "tc_demo", "Catalog (must exist or you need CREATE CATALOG)")
+dbutils.widgets.text("catalog", "dlt_test", "Catalog (must exist or you need CREATE CATALOG)")
 dbutils.widgets.dropdown("create_catalog", "no", ["no", "yes"], "Create catalog if missing")
 CATALOG = dbutils.widgets.get("catalog").strip()
 
